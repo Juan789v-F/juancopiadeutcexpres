@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # Aplicación Laravel
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: xpressutc_app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+      - ./storage:/var/www/storage
+      - ./bootstrap/cache:/var/www/bootstrap/cache
+    networks:
+      - xpressutc
+    depends_on:
+      - db
+    environment:
+      - DB_CONNECTION=mysql
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=xpressutc
+      - DB_USERNAME=xpressutc_user
+      - DB_PASSWORD=secret
+
+  # Servidor web Nginx
+  nginx:
+    image: nginx:alpine
+    container_name: xpressutc_nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./:/var/www
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - xpressutc
+    depends_on:
+      - app
+
+  # Base de datos MySQL
+  db:
+    image: mysql:8.0
+    container_name: xpressutc_db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: xpressutc
+      MYSQL_USER: xpressutc_user
+      MYSQL_PASSWORD: secret
+      MYSQL_ROOT_PASSWORD: root_secret
+    volumes:
+      - dbdata:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - xpressutc
+
+  # Node.js para compilar assets
+  node:
+    image: node:20-alpine
+    container_name: xpressutc_node
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+    command: sh -c "npm install && npm run dev"
+    ports:
+      - "5173:5173"
+    networks:
+      - xpressutc
+
+networks:
+  xpressutc:
+    driver: bridge
+
+volumes:
+  dbdata:
+    driver: local
